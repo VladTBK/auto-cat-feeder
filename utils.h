@@ -1,0 +1,9 @@
+void InitUc(void);
+#define wdogtrig()            #asm("wdr") // call often if Watchdog timer enabled
+
+
+#define LED1 PORTD.6        // PORTx is used for output
+#define SW1 PIND.5          // PINx is used for input
+#define DOUT PORTA.3
+#define PIN_DOUT PINA.3
+#define CLK PORTA.2

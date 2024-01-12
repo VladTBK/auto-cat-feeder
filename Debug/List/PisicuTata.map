@@ -1,0 +1,60 @@
+RAM Allocation [bytes]
+Variable                                                                          Address   Size
+------------------------------------------------------------------------------------------------
+sample                                                                            0x0200       4
+val                                                                               0x0204       4
+count                                                                             0x0208       4
+motorWasOn                                                                        0x020C       1
+milliseconds                                                                      0x020D       4
+seconds                                                                           0x0211       4
+mins                                                                              0x0215       4
+hours                                                                             0x0219       4
+_base_y (alcd.lib)                                                                0x021D       4
+_lcd_x                                                                            0x0221       1
+_lcd_y                                                                            0x0222       1
+_lcd_maxx                                                                         0x0223       1
+
+EEPROM Allocation [bytes]
+Variable                                                                          Address   Size
+------------------------------------------------------------------------------------------------
+
+Register Allocation
+Variable                                                                          Register  Size
+------------------------------------------------------------------------------------------------
+maxWeight                                                                         R3,R4        2
+FoodTime                                                                          R5,R6        2
+checkFoodTime                                                                     R7,R8        2
+delayEquivalent                                                                   R9,R10       2
+changeFrames                                                                      R12          1
+currentWeight                                                                     R13,R14      2
+rotationDir                                                                       R11          1
+
+FLASH Allocation [words]
+Function                                                                          Address   Size
+------------------------------------------------------------------------------------------------
+timer1_compa_isr                                                                  0x000B6     76
+readCount                                                                         0x00102     56
+determineWeight                                                                   0x0013A     50
+stepMotor                                                                         0x0016C     18
+putZeroTime                                                                       0x0017E     11
+putZeroWeight                                                                     0x00189     30
+lcdShowMainFrame                                                                  0x001A7     17
+lcdShowSecondFrame                                                                0x001B8      2
+lcdShowThirdFrame                                                                 0x001BA      4
+lcdShowFourthFrame                                                                0x001BE     20
+displayCurrentFrame                                                               0x001D2      7
+checkButton                                                                       0x001D9     16
+mainAlgorithm                                                                     0x001E9     65
+main                                                                              0x0022A     18
+InitUc                                                                            0x0023C     99
+_lcd_write_nibble_G100                                                            0x0029F     34
+_lcd_write_data                                                                   0x002C1     14
+lcd_gotoxy                                                                        0x002CF     20
+lcd_clear                                                                         0x002E3     12
+lcd_putchar                                                                       0x002EF     30
+lcd_init                                                                          0x0030D     45
+_print_G101                                                                       0x0033A    296
+put_lcd_G101                                                                      0x00462     14
+lcd_printf                                                                        0x00470     39
+strlen                                                                            0x00497     12
+strlenf                                                                           0x004A3     13

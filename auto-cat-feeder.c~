@@ -1,0 +1,222 @@
+#include <mega164a.h>
+#include <alcd.h>
+#include <delay.h>
+#include "utils.h"
+#include <stdbool.h>
+
+// variabile setare greutate maxima si timp verificare greutate //
+int maxWeight; int FoodTime;
+unsigned int checkFoodTime = 0; unsigned int delayEquivalent = 0;
+bool changeFrames = 0; // variabila prin care schimb interfata din buton
+// variabile cantar //
+long sample=8086900;
+long val=1576; // valori de calbirare extrase de pe: https://circuitdigest.com/microcontroller-projects/arduino-weight-measurement-using-load-cell
+               // PS: a se tine cont ca mecanica nu este perfect stabila! De aceea in compararea greutatii finale trebuie sa se tina cont de o eroare de +- 20g
+               // mai ales ca sensibiltatea cantarului este mare.
+long count=0;
+int currentWeight=0;
+
+// variabile motor //
+const long rotationSpeed = 2500; // pentru o viteza mai mic trebuie o valoare mai mare, pt cea mai mare viteza, aproximativ 2000 este pragul
+bool rotationDir = 1;
+bool motorWasOn = 0;
+// intrerupere timer1 pentru setarea timpului //
+
+unsigned long milliseconds = 0; unsigned long seconds = 0; unsigned long mins = 0; unsigned long hours = 0;
+interrupt [TIM1_COMPA] void timer1_compa_isr(void){ 
+    milliseconds ++;
+    if(milliseconds >= 1000){
+        milliseconds = 0;
+        seconds++;
+        if(seconds >= 60){
+            seconds = 0;
+            mins++;
+            if(mins >= 60){
+                mins = 0;
+                hours++;
+            }
+        }
+    }
+    
+}
+//PS: ideal timer-ul ar activa intreruperea la fiecare milisecunda in cap, dar pot aparea intarzieri din cauza executiei instructiunilor, a delay-urilor ( in special la motor ) etc.
+// De aceea pentru o mai buna aproximatie a milisecundei la nivelul programului se poate face o intrupere la fiecare 16-18 numarari (0.8 - 0.9 ms)
+ 
+// functie pentru a citi valoarea de la cantar // 
+unsigned long readCount(void){ 
+    unsigned long Count;
+    unsigned int i;
+    DDRA |= (1<<3);
+    DOUT = 1;
+    CLK = 0;
+    Count=0;
+    DDRA &= ~(1<<3);
+    while(PIN_DOUT);
+    for (i=0;i<24;i++){
+        CLK = 1;
+        Count=Count<<1;
+        CLK = 0;
+        if(PIN_DOUT) 
+         Count++;
+    }
+    CLK = 1;
+    Count=Count^0x800000;
+    CLK = 0;
+    return(Count);
+}
+
+void determineWeight(){
+    count= readCount();
+    currentWeight=((((count-sample)/val)-2*((count-sample)/val))/2); // calcul folsoind valorie calbirate pentru a determina greutatea
+    if (currentWeight < 0) // sunt cazuri atunci cand cantarul este static din cauza balansului si a stabilitati ca greutatea sa fie -1 sau -2 
+        currentWeight = 0;
+}
+        
+// functie rotire motor //
+void stepMotor(){
+    if(rotationDir){   // rotatie counter-clockwise
+            PORTB = 0b10010000;
+            delay_us(rotationSpeed);
+            PORTB = 0b00110000;
+            delay_us(rotationSpeed);
+            PORTB = 0b01100000;
+            delay_us(rotationSpeed);
+            PORTB = 0b11000000;
+            delay_us(rotationSpeed);
+    }
+    else{             // rotatie clockwise
+            PORTB = 0b10010000;
+            delay_us(rotationSpeed);
+            PORTB = 0b11000000;
+            delay_ms(rotationSpeed);
+            PORTB = 0b01100000;
+            delay_ms(rotationSpeed);
+            PORTB = 0b00110000;
+            delay_ms(rotationSpeed);
+    }
+}
+
+// functii show on lcd //
+void putZeroTime(unsigned long time){
+        if(time<10)
+            lcd_printf("0%d",time);
+        else 
+            lcd_printf("%d",time);
+}
+void putZeroWeight(unsigned long Weight){
+        if(Weight<10)
+            lcd_printf("000%d",Weight);
+        else if(Weight <100)
+            lcd_printf("00%d",Weight);
+        else if(Weight <1000)
+            lcd_printf("0%d",Weight);
+        else
+            lcd_printf("%d",Weight);
+}
+void lcdShowMainFrame(){  // frameul principal in care se afla timpul curent si timpul de hranire / greutatea maxima
+    // display current time//
+    lcd_gotoxy(0,0);
+    lcd_printf("Time: ");
+    putZeroTime(hours);
+    lcd_printf(":");
+    putZeroTime(mins);
+    lcd_printf(":");
+    putZeroTime(seconds);
+    lcd_printf("  ");
+    // display curent max weight and check food time
+    lcd_gotoxy(0,1);
+    lcd_printf("Fd:%ds MaxW:%dg",FoodTime,maxWeight);   
+
+}
+void lcdShowSecondFrame(){ // frame in care se poate vedea constat greutatea curenta pe tray
+    // display current time//
+    lcd_gotoxy(0,0);
+    lcd_printf("Time: ");
+    putZeroTime(hours);
+    lcd_printf(":");
+    putZeroTime(mins);
+    lcd_printf(":");
+    putZeroTime(seconds);
+    lcd_printf("  ");
+    // display current weight //
+    lcd_gotoxy(0,1);
+    putZeroWeight(currentWeight);
+    lcd_printf("g           ");
+}
+void lcdShowThirdFrame(){ // ce sa apara pe lcd daca nu este suficienta mancare pe tray
+    lcd_gotoxy(0,0);
+    lcd_printf("Not enough food!");
+    // display current weight //
+    lcd_gotoxy(0,1);
+    putZeroWeight(currentWeight);
+    lcd_printf("g           ");
+}
+void lcdShowFourthFrame(){  // ce sa apara pe lcd daca este deja mancare pe tray
+    lcd_gotoxy(0,0);
+    lcd_printf("Enough food!     ");
+    // display current weight //
+    lcd_gotoxy(0,1);
+    putZeroWeight(currentWeight);
+    lcd_printf("g           ");
+}
+void displayCurrentFrame(){ // imi face switch intre frameul main si second.
+    if(!changeFrames)
+        lcdShowMainFrame();
+    else{
+        determineWeight();
+        lcdShowSecondFrame();
+    }
+}
+// functii generale //
+void checkButton(){
+    if(!SW1){
+        delay_ms(30);
+        if(!SW1){
+            while(!SW1);
+                if(!changeFrames)
+                    changeFrames = 1; // la umatoarea apasare a butonului vreau sa vad greutatea   
+                else 
+                    changeFrames = 0; // la urmatoarea apasare a butonul vreau sa vad timpul 
+        }
+    }
+}
+
+void mainAlgorithm(){
+    if(seconds == checkFoodTime){ //verifica daca au trecut mai mult de 10 secunde
+        delayEquivalent = seconds;   
+        checkFoodTime +=FoodTime;
+        if(checkFoodTime >= 60)
+            checkFoodTime = checkFoodTime - 60; 
+        // in caz ca foar fi 57 de exemplu , 57 + 10 ar da 67. Secundele / Minutele nu pot numara pana la 67 , de acea trebuie sa sccadem o perioada de timp
+        determineWeight();
+            if(currentWeight < maxWeight){
+                while((seconds - delayEquivalent) < 5){  // in loc sa folosim delayuri mari, cu valoarea salvata anterior in delayEquivalent, facem acest while timp de 5 secunde numarate de timer
+                    wdogtrig();
+                    lcdShowThirdFrame();
+                    if((seconds - delayEquivalent) >=3)
+                        motorWasOn = 1;   
+                    if(!motorWasOn) // nu vrem sa invartim motorul tot while-ul de afisare, vrem o perioade diferita
+                        stepMotor();
+                    }
+                motorWasOn = 0;// repornim motorul petru urmatoare verificare
+            }
+            else{
+                while((seconds - delayEquivalent) < 5){
+                    wdogtrig();
+                    lcdShowFourthFrame();
+                }
+            }            
+        }
+}
+void main(void){
+    maxWeight = 100; FoodTime = 20; // greutate este calculata in grame, timpul in secunde
+    checkFoodTime = FoodTime;
+    InitUc();
+    #asm("sei");
+    while (1){
+        wdogtrig();
+        mainAlgorithm();
+        checkButton();
+        displayCurrentFrame();
+    }    
+}
